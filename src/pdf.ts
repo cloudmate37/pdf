@@ -71,11 +71,13 @@ export async function addOCR(pdf: PDFDocument, pages: Map<number, OCRLine[]>, fo
                 continue;
             const angle = word.angle ?? 0;
             const cos = Math.cos(angle), sin = Math.sin(angle);
-            const size = word.box.height * .88;
+            const metricHeight = font.heightAtSize(1);
+            const size = word.box.height / metricHeight;
+            const baselineOffset = (metricHeight - font.heightAtSize(1, { descender: false })) * size;
             const natural = font.widthOfTextAtSize(word.text, size);
             if (!natural)
                 continue;
-            page.pushOperators(pushGraphicsState(), beginText(), setFontAndSize(fontKey, size), setTextRenderingMode(TextRenderingMode.Invisible), setTextMatrix(cos * word.box.width / natural, sin * word.box.width / natural, -sin, cos, word.box.x - sin * word.box.height * .16, word.box.y + cos * word.box.height * .16), showText(font.encodeText(word.text)), endText(), popGraphicsState());
+            page.pushOperators(pushGraphicsState(), beginText(), setFontAndSize(fontKey, size), setTextRenderingMode(TextRenderingMode.Invisible), setTextMatrix(cos * word.box.width / natural, sin * word.box.width / natural, -sin, cos, word.box.x - sin * baselineOffset, word.box.y + cos * baselineOffset), showText(font.encodeText(word.text)), endText(), popGraphicsState());
         }
     }
 }
@@ -122,4 +124,31 @@ export function objectValue(pdf: PDFDocument, obj: unknown, seen = new Set<strin
     return obj?.toString() ?? null;
 }
 export function preservation(pdf: PDFDocument) { return JSON.stringify({ pages: pdf.getPages().map(p => ({ media: p.getMediaBox(), crop: p.getCropBox(), rotation: p.getRotation().angle, annots: objectValue(pdf, p.node.get(PDFName.of('Annots'))) })), forms: objectValue(pdf, pdf.catalog.get(PDFName.of('AcroForm'))) }); }
-export function outlineObjects(pdf: PDFDocument) { return JSON.stringify(objectValue(pdf, pdf.catalog.get(PDFName.of('Outlines')))); }
+export function outlineObjects(pdf: PDFDocument) {
+    // Outline siblings form a doubly linked graph. Serialize each indirect object
+    // once rather than recursively following hundreds of Next/Prev references.
+    const queue: PDFRef[] = [];
+    const seen = new Set<string>();
+    const pages = new Map(pdf.getPages().map((p, i) => [p.ref.toString(), i]));
+    function encode(obj: unknown): unknown {
+        if (obj instanceof PDFRef) {
+            const key = obj.toString();
+            if (pages.has(key)) return { page: pages.get(key) };
+            if (!seen.has(key)) { seen.add(key); queue.push(obj); }
+            return { ref: key };
+        }
+        if (obj instanceof PDFDict) return Object.fromEntries([...obj.entries()].sort((a, b) => a[0].toString().localeCompare(b[0].toString())).map(([k, v]) => [k.decodeText(), encode(v)]));
+        if (obj instanceof PDFArray) return obj.asArray().map(encode);
+        if (obj instanceof PDFHexString || obj instanceof PDFString) return obj.decodeText();
+        if (obj instanceof PDFNumber) return Math.round(obj.asNumber() * 1e6) / 1e6;
+        if (obj && typeof obj === 'object' && 'getContents' in obj) {
+            const stream = obj as { dict: PDFDict; getContents: () => Uint8Array };
+            return { dict: encode(stream.dict), bytes: Array.from(stream.getContents()) };
+        }
+        return obj?.toString() ?? null;
+    }
+    const root = encode(pdf.catalog.get(PDFName.of('Outlines')));
+    const objects = new Map<string, unknown>();
+    for (let i = 0; i < queue.length; i++) objects.set(queue[i].toString(), encode(pdf.context.lookup(queue[i])));
+    return JSON.stringify({ root, objects: [...objects].sort((a, b) => a[0].localeCompare(b[0])) });
+}

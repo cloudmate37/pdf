@@ -66,3 +66,5 @@ PDF.js(읽기·렌더링), Tesseract.js(한국어·영어 OCR), pdf-lib/fontkit(
 개별 의존성의 라이선스와 Noto 글꼴·Tesseract 모델 라이선스는 빌드 자산의 `licenses/`와 `vendor/licenses/`에 포함합니다. 공개 저장소에는 합성 테스트 코드만 포함하며 실제 문헌은 포함하지 않습니다.
 
 검증 결과와 실제 문헌 검증 방법은 [VALIDATION.md](VALIDATION.md)를 참고하세요.
+
+배포 주소에서 테스트하려면 `PDF_BASE_URL=https://cloudmate37.github.io/pdf/ pnpm test:e2e`를 사용하세요. 검증용 합성 문서도 브라우저 안에서만 처리됩니다.

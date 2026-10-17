@@ -1,4 +1,6 @@
 // Uses the developer's configured Git credential helper. Credentials stay in memory.
+import {inspect} from 'node:util';
+inspect.defaultOptions.depth=8;
 import {spawnSync} from 'node:child_process';
 const repo='cloudmate37/pdf';
 let token=process.env.GH_TOKEN||process.env.GITHUB_TOKEN;
