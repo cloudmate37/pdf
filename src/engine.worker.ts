@@ -1,13 +1,14 @@
 /// <reference lib="webworker" />
 import * as pdfjs from 'pdfjs-dist';
-import { createWorker, OEM, type Worker as OCRWorker } from 'tesseract.js';
+import { createWorker, OEM } from 'tesseract.js';
+import { OCRSession } from './ocr';
 import { openWritable, putOutline, addOCR, geometry, preservation, outlineObjects } from './pdf';
 import { analyze, ocrHeadings } from './analysis';
 import { extractOutline, clean } from './outline';
 import type { Entry, Heading, OCRLine, JobRequest, Progress, EngineMessage } from './types';
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let canceled = false;
-let ocr: OCRWorker | undefined;
+let ocr: OCRSession | undefined;
 let render: ReturnType<pdfjs.PDFPageProxy['render']> | undefined;
 const ports: Worker[] = [];
 let activeDocs: pdfjs.PDFDocumentProxy[] = [];
@@ -149,22 +150,42 @@ async function process(job: JobRequest) {
         }
         if (!ocr) {
             progress({ stage: 'ocr-model', message: '한국어·영어 OCR 모델 준비 중…' });
-            ocr = await createWorker('kor+eng', OEM.LSTM_ONLY, { workerPath: job.base + 'vendor/ocr/worker.min.js', corePath: job.base + 'vendor/ocr/core', langPath: job.base + 'vendor/ocr/lang', gzip: false, workerBlobURL: false, cacheMethod: 'none', logger: m => { if (!canceled && m.status === 'loading language traineddata')
-                    progress({ stage: 'ocr-model', message: '한국어·영어 OCR 모델 불러오는 중…' }); } });
-            await ocr.setParameters({ preserve_interword_spaces: '1' });
-            check();
+            ocr = new OCRSession(async scalar => {
+                const worker = await createWorker('kor+eng', OEM.LSTM_ONLY, {
+                    workerPath: job.base + 'vendor/ocr/worker.min.js',
+                    corePath: job.base + 'vendor/ocr/core' + (scalar ? '/tesseract-core-lstm.wasm.js' : ''),
+                    langPath: job.base + 'vendor/ocr/lang', gzip: false,
+                    workerBlobURL: false, cacheMethod: 'none',
+                    // Tesseract already rejects the promise; suppress its second,
+                    // uncaught exception so the recovery/file-error path can run.
+                    errorHandler: () => {},
+                    logger: m => { if (!canceled && m.status === 'loading language traineddata')
+                        progress({ stage: 'ocr-model', message: '한국어·영어 OCR 모델 불러오는 중…' }); }
+                });
+                await worker.setParameters({ preserve_interword_spaces: '1' });
+                return worker;
+            }, () => progress({stage:'ocr-retry',message:'OCR 엔진을 재시작해 메모리 사용을 줄여 다시 인식 중…',page:i+1,total:doc.numPages}));
         }
         progress({ stage: 'ocr', message: `${i + 1} / ${doc.numPages} 페이지 OCR 중…`, page: i + 1, total: doc.numPages });
         const unit = page.getViewport({ scale: 1 });
         const scale = Math.min(3, 5000 / Math.max(unit.width, unit.height));
         let rasterized = await raster(page, scale);
         try {
-            let blob = await rasterized.canvas.convertToBlob({ type: 'image/png' });
-            let response = await ocr.recognize(blob, {}, { text: true, blocks: true });
+            let response = await ocr.recognize(async retry => {
+                if (retry) {
+                    rasterized.canvas.width = 0; rasterized.canvas.height = 0;
+                    rasterized = await raster(page, scale * .75);
+                }
+                return rasterized.canvas.convertToBlob({type:'image/png'});
+            });
             check();
             if (page.rotate !== 0) {
-                const alternate = await raster(page, scale, 0);
-                const candidate = await ocr.recognize(await alternate.canvas.convertToBlob({ type: 'image/png' }), {}, { text: true, blocks: true });
+                let alternate = await raster(page, scale, 0);
+                let candidate;
+                try { candidate = await ocr.recognize(async retry => {
+                    if (retry) { alternate.canvas.width = 0; alternate.canvas.height = 0; alternate = await raster(page, scale * .75, 0); }
+                    return alternate.canvas.convertToBlob({type:'image/png'});
+                }); } catch (error) { alternate.canvas.width = 0; alternate.canvas.height = 0; throw error; }
                 check();
                 const score = (data: typeof response.data) => data.confidence * Math.sqrt(clean(data.text).length);
                 if (score(candidate.data) > score(response.data)) {
