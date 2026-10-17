@@ -243,7 +243,7 @@ async function process(job: JobRequest) {
     }
     if (recognized.size) {
         progress({ stage: 'write', message: '검색·복사용 텍스트 레이어 추가 중…' });
-        const r = await fetch(job.base + 'vendor/fonts/NotoSansCJKkr-Regular.otf');
+        const r = await fetch(job.base + 'vendor/fonts/NanumGothic-Regular.ttf');
         if (!r.ok)
             throw Error('OCR 글꼴을 불러올 수 없습니다.');
         await addOCR(writable, recognized, new Uint8Array(await r.arrayBuffer()));

@@ -79,7 +79,7 @@ export async function analyze(page: PDFPageProxy, index: number): Promise<Analys
         const numbered = numberedDepth(title);
         const style = content.styles[row[0].fontName];
         const bold = /bold|black|heavy|semibold/i.test((style?.fontFamily ?? '') + ' ' + row[0].fontName);
-        if (title.length <= 240 && title.length >= 2 && (numbered !== undefined || font >= body * 1.18 || (bold && title.length < 100 && !/[.!?。]$/.test(title))))
+        if (title.length <= 240 && title.length >= 2 && (/^(목\s*차|차례|contents|table of contents)$/i.test(title) || numbered !== undefined || font >= body * 1.18 || (bold && title.length < 100 && !/[.!?。]$/.test(title))))
             layout.push({ title, pageIndex: index, x: Math.min(...row.map(t => t.transform[4])), y: Math.max(...row.map(t => t.transform[5] + font)), font, order: layout.length });
     }
     return { tagged, layout, text: clean(items.map(t => t.str).join(' ')) };

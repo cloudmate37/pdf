@@ -62,7 +62,8 @@ export function putOutline(pdf: PDFDocument, entries: Entry[]) {
 }
 export async function addOCR(pdf: PDFDocument, pages: Map<number, OCRLine[]>, fontBytes: Uint8Array) {
     pdf.registerFontkit(fontkit);
-    const font = await pdf.embedFont(fontBytes, { subset: true });
+    // Keep the complete TrueType font; partial subsets can lose characters in PDFKit search.
+    const font = await pdf.embedFont(fontBytes, { subset: false });
     for (const [index, words] of pages) {
         const page = pdf.getPage(index);
         const fontKey = page.node.newFontDictionary(font.name, font.ref);

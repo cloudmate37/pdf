@@ -7,7 +7,7 @@ const output = '.tmp';
 async function fixture(korean = false, existing = false) {
     const pdf = await PDFDocument.create();
     pdf.registerFontkit(fontkit);
-    const font = korean ? await pdf.embedFont(await readFile('public/vendor/fonts/NotoSansCJKkr-Regular.otf'), { subset: true }) : await pdf.embedFont(StandardFonts.Helvetica);
+    const font = korean ? await pdf.embedFont(await readFile('public/vendor/fonts/NanumGothic-Regular.ttf'), { subset: false }) : await pdf.embedFont(StandardFonts.Helvetica);
     for (let i = 0; i < 2; i++) {
         const p = pdf.addPage([612, 792]);
         p.drawText(korean ? `제${i + 1}장 연구 방법` : `Chapter ${i + 1} ${i ? 'Methods' : 'Introduction'}`, { x: 60, y: 710, size: 24, font });
@@ -21,7 +21,7 @@ async function fixture(korean = false, existing = false) {
 }
 async function scan(page: Page, korean = false) {
     const png = await page.evaluate(async (ko) => {
-        const font = new FontFace('FixtureNoto', `url(${location.origin}/pdf/vendor/fonts/NotoSansCJKkr-Regular.otf)`);
+        const font = new FontFace('FixtureKorean', `url(${location.origin}/pdf/vendor/fonts/NanumGothic-Regular.ttf)`);
         await font.load();
         document.fonts.add(font);
         const c = document.createElement('canvas');
@@ -31,11 +31,11 @@ async function scan(page: Page, korean = false) {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, c.width, c.height);
         ctx.fillStyle = '#111';
-        ctx.font = '52px FixtureNoto';
+        ctx.font = '52px FixtureKorean';
         ctx.fillText(ko ? '제1장 연구 방법' : 'Chapter 1 Introduction', 120, 180);
-        ctx.font = '38px FixtureNoto';
+        ctx.font = '38px FixtureKorean';
         ctx.fillText(ko ? '제1절 연구 배경' : '1.1 Background', 120, 300);
-        ctx.font = '26px FixtureNoto';
+        ctx.font = '26px FixtureKorean';
         for (let i = 0; i < 8; i++)
             ctx.fillText(ko ? '연구의 목적과 방법을 검토합니다.' : 'This is the body of the research document.', 120, 420 + i * 54);
         return c.toDataURL('image/png').split(',')[1];

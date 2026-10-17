@@ -51,7 +51,7 @@ pnpm exec playwright install chromium webkit
 pnpm test:e2e
 ```
 
-`pnpm assets`는 라이브러리의 Worker·WASM·CMap을 복사하고, SHA-256으로 고정된 OCR 모델과 Noto 글꼴을 다운로드합니다. 생성된 `public/vendor/`와 `dist/`는 Git에 포함하지 않습니다. `scripts/assets-lock.json`의 체크섬이 맞지 않으면 빌드를 중단합니다.
+`pnpm assets`는 라이브러리의 Worker·WASM·CMap을 복사하고, SHA-256으로 고정된 OCR 모델과 Nanum Gothic 글꼴을 다운로드합니다. 생성된 `public/vendor/`와 `dist/`는 Git에 포함하지 않습니다. `scripts/assets-lock.json`의 체크섬이 맞지 않으면 빌드를 중단합니다.
 
 ## GitHub Pages 배포
 
@@ -63,7 +63,7 @@ pnpm test:e2e
 
 PDF.js(읽기·렌더링), Tesseract.js(한국어·영어 OCR), pdf-lib/fontkit(PDF 수정·글꼴 삽입)을 사용합니다. 기존 Mac 앱의 제목 제외·중복 제거·머리말 제거 규칙을 TypeScript로 이식했습니다.
 
-개별 의존성의 라이선스와 Noto 글꼴·Tesseract 모델 라이선스는 빌드 자산의 `licenses/`와 `vendor/licenses/`에 포함합니다. 공개 저장소에는 합성 테스트 코드만 포함하며 실제 문헌은 포함하지 않습니다.
+개별 의존성의 라이선스와 Nanum Gothic 글꼴·Tesseract 모델 라이선스는 빌드 자산의 `licenses/`와 `vendor/licenses/`에 포함합니다. 공개 저장소에는 합성 테스트 코드만 포함하며 실제 문헌은 포함하지 않습니다.
 
 검증 결과와 실제 문헌 검증 방법은 [VALIDATION.md](VALIDATION.md)를 참고하세요.
 
