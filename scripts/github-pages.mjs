@@ -1,0 +1,9 @@
+// Uses the developer's configured Git credential helper. Credentials stay in memory.
+import {spawnSync} from 'node:child_process';
+const repo='cloudmate37/pdf';
+let token=process.env.GH_TOKEN||process.env.GITHUB_TOKEN;
+if(!token){const r=spawnSync('git',['credential','fill'],{input:'protocol=https\nhost=github.com\n\n',encoding:'utf8',env:{...process.env,GIT_TERMINAL_PROMPT:'0'}});if(r.status===0)token=r.stdout.split('\n').find(l=>l.startsWith('password='))?.slice(9);}
+if(!token)throw Error('GitHub credentials are not available through the configured Git credential helper.');
+async function api(path,method='GET',body){const response=await fetch('https://api.github.com/repos/'+repo+path,{method,headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});const data=await response.json().catch(()=>({}));if(!response.ok && !(path==='/pages' && response.status===404))throw Error(`${method} ${path}: ${response.status} ${data.message??''}`);return {status:response.status,data};}
+if(process.argv.includes('--enable')){const existing=await api('/pages');const result=await api('/pages',existing.status===404?'POST':'PUT',{build_type:'workflow'});console.log({pages:result.status,html_url:result.data.html_url??'https://cloudmate37.github.io/pdf/'});}
+const runs=await api('/actions/runs?per_page=3');console.log(runs.data.workflow_runs?.map(r=>({id:r.id,status:r.status,conclusion:r.conclusion,url:r.html_url,sha:r.head_sha})));if(process.argv.includes('--jobs')){const run=runs.data.workflow_runs?.[0];if(run){const jobs=await api(`/actions/runs/${run.id}/jobs`);console.log(jobs.data.jobs?.map(j=>({name:j.name,status:j.status,conclusion:j.conclusion,steps:j.steps?.map(s=>({name:s.name,conclusion:s.conclusion}))})));}}
